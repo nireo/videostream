@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>simple video streamer</title>
+  </head>
+  <body>
+    <center>
+      <h1>video streamer</h1>
+      <video height="600" id="video" controls></video>
+    </center>
+
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script>
+      if (Hls.isSupported()) {
+        var video = document.getElementById("video");
+        var hls = new Hls({
+          debug: true,
+        });
+        hls.loadSource("http://localhost:8080/index/stream");
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MEDIA_ATTACHED, function () {
+          video.muted = true;
+          video.play();
+        });
+      } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        video.src = "http://localhost:8080/index/stream";
+        video.addEventListener("canplay", function () {
+          video.play();
+        });
+      }
+    </script>
+  </body>
+</html>
