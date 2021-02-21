@@ -3,7 +3,7 @@
 #EXT-X-TARGETDURATION:11
 #EXT-X-MEDIA-SEQUENCE:0
 #EXTINF:11.483333,
-index.0.ts
+index0.ts
 #EXTINF:0.066667,
-index.1.ts
+index1.ts
 #EXT-X-ENDLIST

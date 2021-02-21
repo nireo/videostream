@@ -28,10 +28,7 @@ func videoServe(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		return
 	}
 
-	id := ps.ByName("id") + ".m3u8"
-
-	mediaFile := fmt.Sprintf("./videos/%s", id)
-	fmt.Println("request")
+	mediaFile := fmt.Sprintf("./videos/%s/index.m3u8", ps.ByName("id"))
 
 	// if the file exists, return the file data.
 	http.ServeFile(w, r, mediaFile)
@@ -39,7 +36,7 @@ func videoServe(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 }
 
 func serveHlsSegments(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	mediaFile := fmt.Sprintf("./videos/" + ps.ByName("seg"))
+	mediaFile := fmt.Sprintf("./videos/" + ps.ByName("id") + "/" + ps.ByName("seg"))
 	http.ServeFile(w, r, mediaFile)
 	w.Header().Set("Content-Type", "video/MP2T")
 }
@@ -74,6 +71,7 @@ func uploadVideoHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Par
 		http.Error(w, "FILE_TOO_BIG", http.StatusBadRequest)
 		return
 	}
+
 	fileBytes, err := ioutil.ReadAll(file)
 	if err != nil {
 		http.Error(w, "INVALID_FILE", http.StatusBadRequest)
@@ -124,7 +122,7 @@ func createFormattedVideo(videoName string) error {
 
 	arguments := []string{"-i", ("./videos/" + videoName), "-profile:v", "baseline", "-level", "3.0", "-s",
 		"640x360", "-start_number", "0", "-hls_time", "10", "-hls_list_size", "0", "-f", "hls", "./videos/" +
-			filename + "/index..m3u8"}
+			filename + "/index.m3u8"}
 
 	if err := exec.Command("ffmpeg", arguments...).Run(); err != nil {
 		return err
@@ -147,7 +145,7 @@ func initVideos() error {
 
 		// check that the file doesn't have a formatted video
 		withoutMp4 := strings.Replace(file.Name(), ".mp4", "", -1)
-		if ok, err := exists(withoutMp4); !ok || err != nil {
+		if ok, _ := exists(withoutMp4); ok {
 			continue
 		}
 
@@ -213,7 +211,7 @@ func main() {
 	router.GET("/video/:id/stream/", videoServe)
 	router.GET("/video/:id/stream/:seg", serveHlsSegments)
 	router.POST("/upload", uploadVideoHandler)
-	router.GET("/videos", serveVideosPage)
+	router.GET("/", serveVideosPage)
 	router.GET("/video/:id", servePage)
 
 	fmt.Println("starting to format videos...")

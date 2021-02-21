@@ -11,19 +11,23 @@
 
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script>
+      // get the video id from the url
+      let splitted = window.location.href.split("/");
+      let videoId = splitted[splitted.length - 1];
+
       if (Hls.isSupported()) {
         var video = document.getElementById("video");
         var hls = new Hls({
           debug: true,
         });
-        hls.loadSource("http://localhost:8080/index/stream");
+        hls.loadSource(`http://localhost:8080/video/${videoId}/stream`);
         hls.attachMedia(video);
         hls.on(Hls.Events.MEDIA_ATTACHED, function () {
           video.muted = true;
           video.play();
         });
       } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        video.src = "http://localhost:8080/index/stream";
+        video.src = `http://localhost:8080/video/${videoId}/stream`;
         video.addEventListener("canplay", function () {
           video.play();
         });
