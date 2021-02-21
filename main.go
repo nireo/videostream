@@ -11,9 +11,16 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/julienschmidt/httprouter"
 )
+
+type video struct {
+	Name string
+}
+
+var videos []video
 
 func videoServe(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	if r.Method != http.MethodGet {
@@ -97,18 +104,84 @@ func uploadVideoHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Par
 	}
 
 	defer newFile.Close()
+
+	// we still store the .mp4 file just in case
 	if _, err := newFile.Write(fileBytes); err != nil || newFile.Close() != nil {
 		http.Error(w, "cannot write the file", http.StatusInternalServerError)
 		return
 	}
 
-	// use the ffmpeg command to convert the file .m3u8 and .ts
-	arguments := []string{"-i", newPath, "-profile:v", "baseline", "-level", "3.0", "-s",
-		"640x360", "-start_number", "0", "-hls_time", "10", "-hls_list_size", "0", "-f", "hls", fileName + ".m3u8"}
-	if err := exec.Command("ffmpeg", arguments...).Run(); err != nil {
-		http.Error(w, "could not format file using ffmpeg", http.StatusInternalServerError)
-		return
+	createFormattedVideo(fileName + fileEndings[0])
+}
+
+func createFormattedVideo(videoName string) error {
+	filename := strings.Replace(videoName, ".mp4", "", -1)
+
+	// create a new folder for the .ts and .m3u8 files.
+	if err := os.Mkdir("./videos/"+filename, 0755); err != nil {
+		return err
 	}
+
+	arguments := []string{"-i", ("./videos/" + videoName), "-profile:v", "baseline", "-level", "3.0", "-s",
+		"640x360", "-start_number", "0", "-hls_time", "10", "-hls_list_size", "0", "-f", "hls", "./videos/" +
+			filename + "/index..m3u8"}
+
+	if err := exec.Command("ffmpeg", arguments...).Run(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func initVideos() error {
+	files, err := ioutil.ReadDir("./videos")
+	if err != nil {
+		return err
+	}
+
+	for _, file := range files {
+		// ignore every file other than mp4
+		if !strings.HasSuffix(file.Name(), ".mp4") || file.IsDir() {
+			continue
+		}
+
+		// check that the file doesn't have a formatted video
+		withoutMp4 := strings.Replace(file.Name(), ".mp4", "", -1)
+		if ok, err := exists(withoutMp4); !ok || err != nil {
+			continue
+		}
+
+		if err := createFormattedVideo(file.Name()); err != nil {
+			log.Printf("error creating .m3u8 file for %s\n", file.Name())
+			continue
+		}
+	}
+
+	filesNew, err := ioutil.ReadDir("./videos")
+	if err != nil {
+		return err
+	}
+
+	for _, file := range filesNew {
+		if !file.IsDir() {
+			continue
+		}
+
+		videos = append(videos, video{file.Name()})
+	}
+
+	return nil
+}
+
+func exists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
 }
 
 func createRandomIdentifier(len int) string {
@@ -117,13 +190,39 @@ func createRandomIdentifier(len int) string {
 	return fmt.Sprintf("%x", b)
 }
 
+type videosPage struct {
+	Videos []video
+	Amount int
+}
+
+func serveVideosPage(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	pageData := &videosPage{
+		Videos: videos,
+		Amount: len(videos),
+	}
+
+	tmpl := template.Must(template.ParseFiles("./static/videos.html"))
+	if err := tmpl.Execute(w, pageData); err != nil {
+		http.Error(w, "error creating template", http.StatusInternalServerError)
+		return
+	}
+}
+
 func main() {
 	router := httprouter.New()
-	router.GET("/:id/stream/", videoServe)
-	router.GET("/:id/stream/:seg", serveHlsSegments)
+	router.GET("/video/:id/stream/", videoServe)
+	router.GET("/video/:id/stream/:seg", serveHlsSegments)
 	router.POST("/upload", uploadVideoHandler)
-	router.GET("/", servePage)
+	router.GET("/videos", serveVideosPage)
+	router.GET("/video/:id", servePage)
 
+	fmt.Println("starting to format videos...")
+	if err := initVideos(); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("video formatting done...")
+
+	fmt.Println("starting http server...")
 	if err := http.ListenAndServe("localhost:8080", router); err != nil {
 		log.Fatal(err)
 	}

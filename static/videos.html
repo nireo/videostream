@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html>
+  <title>video listings</title>
+  <body>
+    <h1>videos</h1>
+    <p>currently indexed {{ .Amount }} videos</p>
+    {{ range .Videos }}
+    <a href="/video/{{ .Name }}">{{ .Name }}</a>
+    {{ end }}
+  </body>
+</html>
