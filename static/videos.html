@@ -4,8 +4,14 @@
   <body>
     <h1>videos</h1>
     <p>currently indexed {{ .Amount }} videos</p>
-    {{ range .Videos }}
-    <a href="/video/{{ .Name }}">{{ .Name }}</a>
-    {{ end }}
+    <a href="/upload">upload a new file</a>
+    <hr />
+    <ul>
+      {{ range .Videos }}
+      <li>
+        <a href="/video/{{ .Name }}">{{ .Name }}</a>
+      </li>
+      {{ end }}
+    </ul>
   </body>
 </html>
